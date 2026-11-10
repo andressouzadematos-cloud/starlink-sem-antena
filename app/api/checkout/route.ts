@@ -49,9 +49,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Telefone inválido." }, { status: 400 });
     }
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    const origem = new URL(req.url).origin;
+    const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || origem).replace(/\/$/, "");
+
+    if (!siteUrl.startsWith("https://")) {
+      console.error("URL do site inválida:", siteUrl);
+      return NextResponse.json(
+        { error: "Configuração do site ausente. Contate o suporte." },
+        { status: 500 }
+      );
+    }
+
     const externalId = `pedido-${randomUUID()}`;
 
+    console.log("siteUrl usada:", siteUrl);
     console.log("Criando PIX na NexusPag:", {
       valor: planoEscolhido.valor,
       plano: planoEscolhido.nome,

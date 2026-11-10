@@ -102,17 +102,36 @@ function CheckoutConteudo() {
   const modelosDisponiveis = marca ? MODELOS[marca] || [] : [];
   const podePagar = nome && email && documento && telefone && marca && modelo && !carregando;
 
-  useEffect(() => {
+   useEffect(() => {
     if (!pix) return;
+    if (status === "paid") return;
+
+    let ativo = true;
 
     const intervalo = setInterval(async () => {
+      if (!ativo) return;
       try {
-        const r = await fetch(`/api/status/${pix.txId}`);
+        const r = await fetch(`/api/status/${pix.txId}`, { cache: "no-store" });
         const d = await r.json();
         if (d.status) setStatus(d.status);
       } catch {
         // silencioso
       }
+    }, 5000);
+
+    return () => {
+      ativo = false;
+      clearInterval(intervalo);
+    };
+  }, [pix, status]);
+
+  useEffect(() => {
+    if (status !== "paid") return;
+    const t = setTimeout(() => {
+      window.location.href = `/obrigado?tx=${pix?.txId ?? ""}`;
+    }, 1800);
+    return () => clearTimeout(t);
+  }, [status, pix]);
     }, 5000);
 
     return () => clearInterval(intervalo);

@@ -102,7 +102,7 @@ function CheckoutConteudo() {
   const modelosDisponiveis = marca ? MODELOS[marca] || [] : [];
   const podePagar = nome && email && documento && telefone && marca && modelo && !carregando;
 
-   useEffect(() => {
+  useEffect(() => {
     if (!pix) return;
     if (status === "paid") return;
 
@@ -132,10 +132,6 @@ function CheckoutConteudo() {
     }, 1800);
     return () => clearTimeout(t);
   }, [status, pix]);
-    }, 5000);
-
-    return () => clearInterval(intervalo);
-  }, [pix]);
 
   async function pagar() {
     setErro("");

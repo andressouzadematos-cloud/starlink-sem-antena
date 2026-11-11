@@ -154,7 +154,7 @@ const FAQ = [
   {
     pergunta: "Funciona com qualquer operadora?",
     resposta:
-      "Não depende de operadora nenhuma. O Starlink Sem Antena usa rede própria de satélite, então funciona mesmo onde Vivo, TIM, Claro e Oi não têm sinal.",
+      "Não depende de operadora nenhuma. O Starlink E-Sim usa rede própria de satélite, então funciona mesmo onde Vivo, TIM, Claro e Oi não têm sinal.",
   },
   {
     pergunta: "Tem fidelidade?",
@@ -189,7 +189,7 @@ function Logo({ tamanho = "h-7" }: { tamanho?: string }) {
   return (
     <img
       src="/logo.png"
-      alt="Starlink Sem Antena"
+      alt="Starlink E-Sim"
       className={`${tamanho} w-auto object-contain`}
       onError={() => setFalhou(true)}
     />
@@ -254,7 +254,7 @@ export default function Home() {
               <Logo />
             </div>
             <span className="hidden text-[11px] font-bold uppercase tracking-[0.2em] text-white/70 sm:block">
-              Sem Antena
+              E-Sim
             </span>
           </a>
           <button
@@ -283,7 +283,7 @@ export default function Home() {
           </h1>
 
           <p className="anim-fade-up delay-2 mt-6 max-w-2xl text-lg leading-relaxed text-white/80">
-            O Starlink Sem Antena é um <strong className="text-white">e-SIM</strong> — um chip
+            O Starlink E-Sim é um <strong className="text-white">e-SIM</strong> — um chip
             digital que já vem dentro do seu celular, sem precisar de cartão físico. Você ativa
             por QR Code em minutos e navega em qualquer lugar do Brasil. Sem antena, sem técnico,
             sem fidelidade.
@@ -365,7 +365,7 @@ export default function Home() {
               className="reveal rounded-2xl border border-[#2563EB]/40 bg-[#2563EB]/5 p-8 shadow-[0_0_40px_rgba(37,99,235,0.15)] transition-transform duration-300 hover:-translate-y-1"
             >
               <h3 className="text-sm font-black uppercase tracking-wider text-[#60A5FA]">
-                Starlink Sem Antena
+                Starlink E-Sim
               </h3>
               <ul className="mt-6 space-y-3">
                 {COMPARATIVO_BOM.map((item) => (
@@ -418,7 +418,7 @@ export default function Home() {
             className="reveal mt-10 rounded-2xl border border-[#2563EB]/40 bg-[#2563EB]/5 p-8"
           >
             <p className="text-lg leading-relaxed text-white/90">
-              Enquanto elas brigam por quem te prende melhor, o Starlink Sem Antena resolve em 5
+              Enquanto elas brigam por quem te prende melhor, o Starlink E-Sim resolve em 5
               minutos com um e-SIM que funciona em qualquer lugar do Brasil. Sem antena, sem
               técnico, sem fidelidade, sem multa. Você paga R$ 49,90 e usa o mês inteiro. Elas
               cobram R$ 289 e te limitam a 5GB.{" "}
@@ -501,7 +501,7 @@ export default function Home() {
           >
             <p className="text-lg leading-relaxed text-white/90">
               Enquanto a operadora te obriga a esperar 15 dias por um técnico, você ativa o
-              Starlink Sem Antena em 5 minutos e navega de qualquer lugar do país.
+              Starlink E-Sim em 5 minutos e navega de qualquer lugar do país.
             </p>
           </div>
         </div>
@@ -714,7 +714,7 @@ export default function Home() {
           <div className="mx-auto flex h-12 w-fit items-center rounded-lg bg-white px-3">
             <Logo tamanho="h-8" />
           </div>
-          <p className="mt-4 text-sm font-bold text-white/70">Starlink Sem Antena</p>
+          <p className="mt-4 text-sm font-bold text-white/70">Starlink E-Sim</p>
           <div className="mt-6 flex flex-wrap justify-center gap-6 text-sm font-semibold text-white/50">
             <a href="#" className="transition-colors hover:text-white">
               Termos

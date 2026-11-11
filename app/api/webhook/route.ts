@@ -1,67 +1,165 @@
 import { NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/supabase";
 import { createHmac, timingSafeEqual } from "crypto";
+import { getSupabaseAdmin } from "@/lib/supabase";
 
-const WEBHOOK_SECRET = "COLE_AQUI_O_WEBHOOK_SECRET_DO_PAINEL";
-const TOLERANCIA_SEGUNDOS = 300;
+type PayloadWebhook = {
+  event?: string;
+  type?: string;
+  status?: string;
+  data?: {
+    id?: string;
+    txid?: string;
+    transaction_id?: string;
+    status?: string;
+    amount?: number;
+    paid_at?: string;
+  };
+  transaction?: {
+    id?: string;
+    txid?: string;
+    status?: string;
+    amount?: number;
+    paid_at?: string;
+  };
+};
 
-function assinaturaValida(corpoCru: string, header: string | null): boolean {
-  if (!header) return false;
-
-  const partes = Object.fromEntries(
-    header.split(",").map((p) => p.split("=") as [string, string])
+function extrairTxId(payload: PayloadWebhook): string | null {
+  return (
+    payload?.data?.id ||
+    payload?.data?.txid ||
+    payload?.data?.transaction_id ||
+    payload?.transaction?.id ||
+    payload?.transaction?.txid ||
+    null
   );
+}
 
-  const timestamp = Number(partes.t);
-  const assinatura = partes.v1;
+function extrairStatus(payload: PayloadWebhook): string | null {
+  return payload?.data?.status || payload?.transaction?.status || payload?.status || null;
+}
 
-  if (!timestamp || !assinatura) return false;
+function assinaturaValida(corpoBruto: string, assinatura: string | null): boolean {
+  const segredo = process.env.NEXUSPAG_WEBHOOK_SECRET;
 
-  const agora = Math.floor(Date.now() / 1000);
-  if (Math.abs(agora - timestamp) > TOLERANCIA_SEGUNDOS) return false;
+  if (!segredo) {
+    console.error("NEXUSPAG_WEBHOOK_SECRET não configurado.");
+    return false;
+  }
 
-  const esperado = createHmac("sha256", WEBHOOK_SECRET)
-    .update(`${timestamp}.${corpoCru}`)
-    .digest("hex");
+  if (!assinatura) {
+    console.error("Requisição sem header de assinatura.");
+    return false;
+  }
 
-  const a = Buffer.from(esperado, "utf8");
-  const b = Buffer.from(assinatura, "utf8");
+  const esperado = createHmac("sha256", segredo).update(corpoBruto).digest("hex");
 
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  const recebido = assinatura.replace(/^sha256=/, "").trim();
+
+  if (recebido.length !== esperado.length) return false;
+
+  try {
+    return timingSafeEqual(Buffer.from(recebido, "hex"), Buffer.from(esperado, "hex"));
+  } catch {
+    return false;
+  }
 }
 
 export async function POST(req: Request) {
-  const corpoCru = await req.text();
+  const corpoBruto = await req.text();
 
-  if (!assinaturaValida(corpoCru, req.headers.get("x-webhook-signature"))) {
-    console.warn("Webhook com assinatura inválida.");
+  const assinatura =
+    req.headers.get("x-nexuspag-signature") ||
+    req.headers.get("x-signature") ||
+    req.headers.get("x-webhook-signature");
+
+  if (!assinaturaValida(corpoBruto, assinatura)) {
+    console.error("Webhook com assinatura inválida.");
     return NextResponse.json({ error: "Assinatura inválida." }, { status: 401 });
   }
 
-  try {
-    const evento = req.headers.get("x-webhook-event") || "";
-    const payload = JSON.parse(corpoCru);
+  let payload: PayloadWebhook;
 
-    if (evento !== "payment.confirmed") {
-      return NextResponse.json({ ok: true });
+  try {
+    payload = JSON.parse(corpoBruto);
+  } catch {
+    console.error("Webhook com JSON inválido.");
+    return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
+  }
+
+  const txId = extrairTxId(payload);
+  const status = extrairStatus(payload);
+
+  console.log("Webhook recebido:", { txId, status, evento: payload?.event || payload?.type });
+
+  if (!txId) {
+    console.error("Webhook sem txId identificável:", corpoBruto);
+    return NextResponse.json({ error: "txId ausente." }, { status: 400 });
+  }
+
+  const statusNormalizado = String(status || "").toLowerCase();
+
+  const pago = ["paid", "approved", "completed", "confirmed", "succeeded", "pago", "aprovado"].includes(
+    statusNormalizado
+  );
+
+  const falhou = ["failed", "refused", "canceled", "cancelled", "expired", "rejected"].includes(
+    statusNormalizado
+  );
+
+  const novoStatus = pago ? "paid" : falhou ? "failed" : "pending";
+
+  try {
+    const supabase = getSupabaseAdmin();
+
+    const { data: pedido, error: erroBusca } = await supabase
+      .from("pedidos")
+      .select("tx_id, status, valor_centavos")
+      .eq("tx_id", txId)
+      .maybeSingle();
+
+    if (erroBusca) {
+      console.error("Erro ao buscar pedido:", JSON.stringify(erroBusca));
+      return NextResponse.json({ error: "Erro ao buscar pedido." }, { status: 500 });
     }
 
-    const txId = payload?.transaction_id;
-    if (!txId) return NextResponse.json({ ok: true });
+    if (!pedido) {
+      console.error("Pedido não encontrado para txId:", txId);
+      return NextResponse.json({ received: true, aviso: "Pedido não encontrado." }, { status: 200 });
+    }
 
-    await getSupabaseAdmin()
+    if (pedido.status === "paid" && novoStatus === "paid") {
+      console.log("Pedido já estava pago, ignorando duplicata:", txId);
+      return NextResponse.json({ received: true, duplicado: true }, { status: 200 });
+    }
+
+    const atualizacao: Record<string, unknown> = {
+      status: novoStatus,
+      atualizado_em: new Date().toISOString(),
+    };
+
+    if (novoStatus === "paid") {
+      atualizacao.pago_em = payload?.data?.paid_at || payload?.transaction?.paid_at || new Date().toISOString();
+    }
+
+    const { error: erroUpdate } = await supabase
       .from("pedidos")
-      .update({
-        status: "paid",
-        pago_em: payload?.paid_at || new Date().toISOString(),
-        atualizado_em: new Date().toISOString(),
-      })
+      .update(atualizacao)
       .eq("tx_id", txId);
 
-    return NextResponse.json({ ok: true });
+    if (erroUpdate) {
+      console.error("Erro ao atualizar pedido:", JSON.stringify(erroUpdate));
+      return NextResponse.json({ error: "Erro ao atualizar pedido." }, { status: 500 });
+    }
+
+    console.log("Pedido atualizado:", { txId, de: pedido.status, para: novoStatus });
+
+    return NextResponse.json({ received: true, status: novoStatus }, { status: 200 });
   } catch (erro) {
-    console.error("Erro no webhook:", erro);
-    return NextResponse.json({ ok: true });
+    console.error("Exceção no webhook:", erro);
+    return NextResponse.json({ error: "Erro interno." }, { status: 500 });
   }
+}
+
+export async function GET() {
+  return NextResponse.json({ ok: true, rota: "webhook" }, { status: 200 });
 }
